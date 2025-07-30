@@ -778,64 +778,64 @@ function displayTechnicalCategoryResults(categories) {
     const categoryDisplayMap = {
         'metaTags': {
             name: 'メタタグの最適化',
-            description: 'SEOメタデータの最適化',
-            items: 'title、description、OGタグ、canonical',
+            description: 'SEOに重要なHTMLメタタグの設定状況を診断',
+            items: 'タイトルタグ（30-60文字推奨）、メタディスクリプション（120-160文字推奨）、OGPタグ（SNS共有用）、カノニカルタグ（重複コンテンツ対策）',
             icon: 'fas fa-tags',
             color: 'blue'
         },
         'htmlStructure': {
             name: 'HTML構造の最適化',
-            description: 'セマンティックHTML構造',
-            items: 'H1タグ、見出し階層、alt属性',
+            description: 'HTMLの構造的な品質と accessibility を診断',
+            items: 'H1タグ（1ページに1つ推奨）、見出し階層（H1→H2→H3の順序）、セマンティック要素（article、section等）、画像のalt属性（視覚障害者対応）',
             icon: 'fas fa-code',
             color: 'green'
         },
         'structuredData': {
             name: '構造化データ (Schema.org)',
-            description: '検索エンジン向け構造化データ',
-            items: 'JSON-LD、Organization、LocalBusiness',
+            description: 'Googleのリッチスニペット表示のための構造化データを診断',
+            items: 'JSON-LD形式の実装、Organization（組織情報）、LocalBusiness（ローカルビジネス）、WebSite（サイト情報）、FAQPage（よくある質問）',
             icon: 'fas fa-database',
             color: 'purple'
         },
         'contentQuality': {
             name: 'コンテンツの質',
-            description: '内容の専門性と独自性',
-            items: 'コンテンツ長、読みやすさ、独自性',
+            description: 'ページコンテンツの品質と価値を総合的に診断',
+            items: 'コンテンツ長（300文字以上推奨）、読みやすさ（適切な段落分け）、独自性（他サイトとの差別化）、マルチメディア要素（画像・動画の活用）',
             icon: 'fas fa-file-alt',
             color: 'yellow'
         },
         'eatElements': {
             name: 'E-E-A-T要素',
-            description: '専門性・権威性・信頼性・経験',
-            items: 'Expertise、Authority、Trust、Experience',
+            description: 'GoogleのSEO評価基準である E-E-A-T を診断',
+            items: 'Expertise（専門性：著者の専門知識）、Authoritativeness（権威性：業界での信頼度）、Trustworthiness（信頼性：サイトの安全性）、Experience（経験：実体験に基づく内容）',
             icon: 'fas fa-shield-alt',
             color: 'red'
         },
         'pageSpeed': {
             name: 'ページ速度',
-            description: 'パフォーマンス最適化',
-            items: '読み込み速度、Core Web Vitals',
+            description: 'ページの表示速度とパフォーマンスを診断',
+            items: '読み込み速度（3秒以内推奨）、Core Web Vitals（LCP・FID・CLS）、モバイルパフォーマンス、サーバー応答時間',
             icon: 'fas fa-tachometer-alt',
             color: 'orange'
         },
         'responsiveDesign': {
             name: 'レスポンシブデザイン',
-            description: 'マルチデバイス対応',
-            items: 'モバイル対応、ビューポート設定',
+            description: 'スマートフォン・タブレット・PCでの表示対応を診断',
+            items: 'モバイルフレンドリー（Googleモバイル対応）、ビューポート設定（適切な表示領域）、レスポンシブ画像（デバイス別最適化）、タッチ操作対応',
             icon: 'fas fa-mobile-alt',
             color: 'teal'
         },
         'httpsConfig': {
             name: 'HTTPS設定',
-            description: 'セキュリティとSSL設定',
-            items: 'SSL証明書、セキュリティヘッダー',
+            description: 'Webサイトのセキュリティ設定と暗号化を診断',
+            items: 'SSL証明書（データ暗号化）、HSTSヘッダー（強制HTTPS）、セキュリティヘッダー（CSP・X-Frame-Options）、混在コンテンツ対策',
             icon: 'fas fa-lock',
             color: 'gray'
         },
         'llmoOptimization': {
             name: 'LLMO特化対策',
-            description: 'AI検索エンジン最適化',
-            items: 'LLMs.txt、FAQ実装、AI可読性',
+            description: 'ChatGPT・Claude等のAI検索エンジンに対する最適化を診断',
+            items: 'LLMs.txt（AI向けサイト情報ファイル）、FAQ実装（質問回答形式）、セマンティックセクション（意味的な構造）、AI可読性（自然言語処理対応）',
             icon: 'fas fa-robot',
             color: 'indigo'
         }
