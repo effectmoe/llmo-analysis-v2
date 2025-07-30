@@ -327,9 +327,13 @@ function displayAllItemsInTable(results) {
     let totalItems = 0;
     
     Object.values(results.categories).forEach(category => {
-        if (category.stats) {
-            totalScore += category.stats.totalScore;
-            maxTotalScore += category.stats.maxScore;
+        if (category.items) {
+            let categoryTotal = 0;
+            category.items.forEach(item => {
+                categoryTotal += item.score || 0;
+            });
+            totalScore += categoryTotal;
+            maxTotalScore += category.items.length * 100;
             totalItems += category.items.length;
         }
     });
@@ -410,7 +414,15 @@ function displayBusinessCategoryResults(categories) {
         
         console.log(`カテゴリー ${index + 1}: ${category.name}`);
         
-        const score = Math.round((category.stats.totalScore / category.stats.maxScore) * 100);
+        let categoryTotal = 0;
+        let categoryMax = 0;
+        if (category.items) {
+            category.items.forEach(item => {
+                categoryTotal += item.score || 0;
+                categoryMax += 100;
+            });
+        }
+        const score = categoryMax > 0 ? Math.round((categoryTotal / categoryMax) * 100) : 0;
         const passed = category.items.filter(item => item.score >= 70).length;
         const warning = category.items.filter(item => item.score >= 30 && item.score < 70).length;
         const critical = category.items.filter(item => item.score < 30).length;
@@ -601,8 +613,8 @@ function showCategoryDetails(categoryKey) {
         const category = currentResults.categories[categoryKey];
         categoryData = {
             items: category.items,
-            totalScore: category.stats.totalScore,
-            maxScore: category.stats.maxScore
+            totalScore: categoryTotal,
+            maxScore: categoryMax
         };
         categoryInfo = {
             name: category.name,
@@ -701,10 +713,14 @@ function aggregateToBusinessCategories(results) {
     // 9カテゴリーを4カテゴリーに振り分け
     Object.entries(results.categories).forEach(([key, category]) => {
         const businessCategory = CATEGORY_MAPPING[key];
-        if (businessCategory && businessResults[businessCategory]) {
+        if (businessCategory && businessResults[businessCategory] && category.items) {
             businessResults[businessCategory].items.push(...category.items);
-            businessResults[businessCategory].totalScore += category.stats.totalScore;
-            businessResults[businessCategory].maxScore += category.stats.maxScore;
+            let categoryTotal = 0;
+            category.items.forEach(item => {
+                categoryTotal += item.score || 0;
+            });
+            businessResults[businessCategory].totalScore += categoryTotal;
+            businessResults[businessCategory].maxScore += category.items.length * 100;
         }
     });
     
@@ -834,10 +850,22 @@ function displayTechnicalCategoryResults(categories) {
             const displayInfo = categoryDisplayMap[categoryKey];
             if (!displayInfo) return;
             
-            const score = category.stats ? Math.round((category.stats.totalScore / category.stats.maxScore) * 100) : 0;
-            const passed = category.items ? category.items.filter(item => item.score >= 70).length : 0;
-            const warning = category.items ? category.items.filter(item => item.score >= 40 && item.score < 70).length : 0;
-            const critical = category.items ? category.items.filter(item => item.score < 40).length : 0;
+            // 実際のスコア計算（APIレスポンスに合わせて修正）
+            let totalScore = 0;
+            let maxScore = 0;
+            if (category.items) {
+                category.items.forEach(item => {
+                    totalScore += item.score || 0;
+                    maxScore += 100;
+                });
+            }
+            const score = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+            const passed = category.items ? category.items.filter(item => (item.score || 0) >= 70).length : 0;
+            const warning = category.items ? category.items.filter(item => {
+                const itemScore = item.score || 0;
+                return itemScore >= 40 && itemScore < 70;
+            }).length : 0;
+            const critical = category.items ? category.items.filter(item => (item.score || 0) < 40).length : 0;
             
             html += `
                 <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('${categoryKey}')">
@@ -1027,10 +1055,18 @@ async function downloadCategoryReport() {
             categoryInfo = BUSINESS_CATEGORIES[currentCategory];
         } else {
             const category = currentResults.categories[currentCategory];
+            let categoryTotal = 0;
+            let categoryMax = 0;
+            if (category.items) {
+                category.items.forEach(item => {
+                    categoryTotal += item.score || 0;
+                    categoryMax += 100;
+                });
+            }
             categoryData = {
                 items: category.items,
-                totalScore: category.stats.totalScore,
-                maxScore: category.stats.maxScore
+                totalScore: categoryTotal,
+                maxScore: categoryMax
             };
             categoryInfo = { name: category.name };
         }
@@ -1107,7 +1143,15 @@ async function downloadAllReports() {
         } else {
             // ビジネス診断の場合はそのまま表示
             Object.entries(currentResults.categories).forEach(([key, category]) => {
-                const categoryScore = Math.round((category.stats.totalScore / category.stats.maxScore) * 100);
+                let categoryTotal = 0;
+                let categoryMax = 0;
+                if (category.items) {
+                    category.items.forEach(item => {
+                        categoryTotal += item.score || 0;
+                        categoryMax += 100;
+                    });
+                }
+                const categoryScore = categoryMax > 0 ? Math.round((categoryTotal / categoryMax) * 100) : 0;
                 
                 markdown += `## ${category.name}（${categoryScore}点）\n\n`;
                 
