@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者ダッシュボード - LLMO診断システム</title>
+    <!-- TailwindCSS CDN with multiple fallbacks -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // TailwindCSS CDN fallback
+        if (!window.tailwind) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/tailwindcss@^3/dist/tailwind.min.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .agent-card {
+            transition: all 0.3s ease;
+        }
+        .agent-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .mcp-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .mcp-playwright { background-color: #e0f2fe; color: #0369a1; }
+        .mcp-cheerio { background-color: #fef3c7; color: #92400e; }
+        .mcp-structured-data { background-color: #ede9fe; color: #6d28d9; }
+        .mcp-gsc { background-color: #dcfce7; color: #166534; }
+        .mcp-github { background-color: #f3f4f6; color: #1f2937; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <header class="bg-gray-900 shadow-sm border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-white">
+                        <i class="fas fa-cog text-yellow-500 mr-2"></i>
+                        管理者ダッシュボード
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="toggleAdminPanel()" class="text-gray-300 hover:text-white">
+                        <i class="fas fa-lock mr-2"></i>
+                        管理者専用
+                    </button>
+                    <a href="/" class="text-gray-300 hover:text-white">
+                        <i class="fas fa-home mr-2"></i>
+                        メインへ戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="admin-content" style="display: none;">
+        <!-- 認証フォーム -->
+        <div id="auth-form" class="max-w-md mx-auto bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">管理者認証</h2>
+            <div class="space-y-4">
+                <input type="password" id="admin-password" placeholder="管理者パスワード" class="w-full px-4 py-2 border rounded-lg">
+                <button onclick="authenticateAdmin()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+                    認証
+                </button>
+            </div>
+        </div>
+
+        <!-- 管理者コンテンツ（認証後に表示） -->
+        <div id="admin-panel" style="display: none;">
+            <!-- Mastraエージェント＆MCP使用状況 -->
+            <div class="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-robot text-blue-600 mr-2"></i>
+                    Mastraエージェント & MCP使用マッピング
+                </h2>
+                
+                <!-- テクニカル診断 -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-blue-600">テクニカル36項目診断</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- メタタグの最適化 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">メタタグの最適化（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">meta-analyzer</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                                <span class="mcp-badge mcp-cheerio">cheerio-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • ページをレンダリング<br>
+                                • メタタグを抽出・分析
+                            </div>
+                        </div>
+                        
+                        <!-- HTML構造の最適化 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">HTML構造の最適化（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">structure-analyzer</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-cheerio">cheerio-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • DOM構造の解析<br>
+                                • セマンティック要素チェック
+                            </div>
+                        </div>
+                        
+                        <!-- 構造化データ -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">構造化データ（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">schema-validator</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-structured-data">structured-data-mcp</span>
+                                <span class="mcp-badge mcp-gsc">gsc-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • Schema.org検証<br>
+                                • GSCリッチリザルトテスト
+                            </div>
+                        </div>
+                        
+                        <!-- コンテンツの質 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">コンテンツの質（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">content-quality</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-cheerio">cheerio-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • テキスト分析<br>
+                                • 可読性スコア計算
+                            </div>
+                        </div>
+                        
+                        <!-- E-E-A-T要素 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">E-E-A-T要素（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">eeat-analyzer</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                                <span class="mcp-badge mcp-cheerio">cheerio-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • 著者情報の検出<br>
+                                • 信頼性シグナル分析
+                            </div>
+                        </div>
+                        
+                        <!-- ページ速度 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">ページ速度（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">performance-tester</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • Core Web Vitals測定<br>
+                                • リソース最適化分析
+                            </div>
+                        </div>
+                        
+                        <!-- レスポンシブ -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">レスポンシブ（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">responsive-tester</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • マルチデバイステスト<br>
+                                • ビューポート検証
+                            </div>
+                        </div>
+                        
+                        <!-- HTTPS設定 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">HTTPS設定（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">security-checker</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • SSL証明書検証<br>
+                                • セキュリティヘッダー確認
+                            </div>
+                        </div>
+                        
+                        <!-- LLMO特化対策 -->
+                        <div class="agent-card border rounded-lg p-4">
+                            <h4 class="font-semibold mb-2">LLMO特化対策（4項目）</h4>
+                            <div class="text-sm text-gray-600 mb-2">
+                                <i class="fas fa-user-secret mr-1"></i>
+                                Agent: <span class="font-mono">llmo-specialist</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="mcp-badge mcp-github">github-mcp</span>
+                                <span class="mcp-badge mcp-playwright">playwright-mcp</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">
+                                • LLMs.txt検証<br>
+                                • AI最適化チェック
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- マーケティング診断 -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4 text-purple-600">マーケティング36項目診断</h3>
+                    <p class="text-gray-600 mb-4">
+                        マーケティング診断は現在、シンプルなルールベースで実装されています。
+                        今後、以下のMastraエージェントとMCPサーバーの統合を予定：
+                    </p>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <ul class="space-y-2 text-sm">
+                            <li>• <strong>market-analyzer</strong>: 市場分析とポジショニング評価</li>
+                            <li>• <strong>conversion-optimizer</strong>: コンバージョン最適化分析</li>
+                            <li>• <strong>brand-evaluator</strong>: ブランド価値評価</li>
+                            <li>• <strong>ai-readiness-checker</strong>: AI対応準備度チェック</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- システム統合状況 -->
+            <div class="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-network-wired text-green-600 mr-2"></i>
+                    システム統合状況
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold mb-2">現在の実装状況</h3>
+                        <ul class="space-y-2 text-sm">
+                            <li class="flex items-center">
+                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                Vercelサーバーレス関数（診断API）
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                                フロントエンドUI（診断・結果表示）
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                                Mastraエージェント統合（未実装）
+                            </li>
+                            <li class="flex items-center">
+                                <i class="fas fa-times-circle text-red-500 mr-2"></i>
+                                MCPサーバー連携（未実装）
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold mb-2">今後の実装予定</h3>
+                        <ul class="space-y-2 text-sm">
+                            <li>1. Mastraコアの統合</li>
+                            <li>2. MCPサーバーの接続設定</li>
+                            <li>3. エージェントワークフローの定義</li>
+                            <li>4. リアルタイム診断の実装</li>
+                            <li>5. キャッシュとパフォーマンス最適化</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API使用統計 -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-chart-bar text-orange-600 mr-2"></i>
+                    API使用統計
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <div class="text-2xl font-bold text-blue-600">0</div>
+                        <div class="text-sm text-gray-600">テクニカル診断</div>
+                    </div>
+                    <div class="text-center p-4 bg-purple-50 rounded-lg">
+                        <div class="text-2xl font-bold text-purple-600">0</div>
+                        <div class="text-sm text-gray-600">マーケティング診断</div>
+                    </div>
+                    <div class="text-center p-4 bg-green-50 rounded-lg">
+                        <div class="text-2xl font-bold text-green-600">0</div>
+                        <div class="text-sm text-gray-600">MCPコール数</div>
+                    </div>
+                    <div class="text-center p-4 bg-orange-50 rounded-lg">
+                        <div class="text-2xl font-bold text-orange-600">0ms</div>
+                        <div class="text-sm text-gray-600">平均応答時間</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 管理者認証（簡易版）
+        const ADMIN_PASSWORD = 'llmo-admin-2025'; // 本番環境では環境変数で管理
+        
+        function authenticateAdmin() {
+            const password = document.getElementById('admin-password').value;
+            if (password === ADMIN_PASSWORD) {
+                document.getElementById('auth-form').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+                localStorage.setItem('llmo-admin-auth', 'true');
+            } else {
+                alert('パスワードが正しくありません');
+            }
+        }
+        
+        function toggleAdminPanel() {
+            const content = document.getElementById('admin-content');
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // 初期表示
+        document.addEventListener('DOMContentLoaded', () => {
+            // 認証状態確認
+            const isAuth = localStorage.getItem('llmo-admin-auth') === 'true';
+            if (isAuth) {
+                document.getElementById('auth-form').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'block';
+            }
+            
+            // URLに?admin=trueがある場合は自動表示
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('admin') === 'true') {
+                document.getElementById('admin-content').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

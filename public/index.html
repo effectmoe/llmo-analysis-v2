@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMO診断ダッシュボード</title>
+    <!-- TailwindCSS CDN with multiple fallbacks -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // TailwindCSS CDN fallback
+        if (!window.tailwind) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/tailwindcss@^3/dist/tailwind.min.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* 基本スタイル（Tailwindが読み込まれない場合のフォールバック） */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f9fafb;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* フォールバックボタンスタイル */
+        button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #2563eb;
+        }
+        
+        /* 診断タイプ選択ボタン */
+        .diagnosis-type-active {
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+        
+        input[type="url"] {
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 6px;
+            width: 100%;
+        }
+        
+        /* カスタムアニメーション */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        /* プログレスバーアニメーション */
+        @keyframes progress {
+            from {
+                width: 0%;
+            }
+        }
+        
+        .progress-animation {
+            animation: progress 1s ease-out;
+        }
+        
+        /* スコアリングアニメーション */
+        .score-circle {
+            transform: rotate(-90deg);
+            transition: stroke-dashoffset 1s ease-out;
+        }
+        
+        /* カテゴリーカードホバー効果 */
+        .category-card {
+            transition: all 0.3s ease;
+        }
+        
+        .category-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* ローディングスピナー */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3B82F6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50" style="background-color: #f9fafb;">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+                        LLMO診断ダッシュボード
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/system-health.html" class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <i class="fas fa-heartbeat mr-2"></i>
+                        システム状況
+                    </a>
+                    <div class="text-sm text-gray-500">
+                        AI検索最適化診断システム v2.0
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 診断タイプ選択 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
+                診断タイプを選択
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                    id="technicalDiagnosisBtn"
+                    onclick="selectDiagnosisType('technical')"
+                    class="p-6 border-2 border-blue-500 rounded-lg hover:bg-blue-50 transition-all diagnosis-type-active"
+                >
+                    <i class="fas fa-code text-3xl text-blue-600 mb-2"></i>
+                    <h3 class="text-lg font-semibold">テクニカル診断</h3>
+                    <p class="text-sm text-gray-600 mt-2">技術的観点から9カテゴリー×4項目で評価</p>
+                    <div class="mt-3 text-xs text-gray-500">
+                        SEO、構造化データ、パフォーマンスなど
+                    </div>
+                </button>
+                <button 
+                    id="businessDiagnosisBtn"
+                    onclick="selectDiagnosisType('business')"
+                    class="p-6 border-2 border-gray-300 rounded-lg hover:bg-purple-50 transition-all"
+                >
+                    <i class="fas fa-chart-line text-3xl text-purple-600 mb-2"></i>
+                    <h3 class="text-lg font-semibold">マーケティング診断</h3>
+                    <p class="text-sm text-gray-600 mt-2">経営的観点から4カテゴリー×9項目で評価</p>
+                    <div class="mt-3 text-xs text-gray-500">
+                        価値提案、コンバージョン、ブランディングなど
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- 診断開始セクション -->
+        <div id="startSection" class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-play-circle text-green-600 mr-2"></i>
+                <span id="diagnosisTypeLabel">テクニカル</span>診断を開始
+            </h2>
+            <div class="flex items-center space-x-4">
+                <input 
+                    type="url" 
+                    id="urlInput" 
+                    placeholder="https://example.com" 
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value=""
+                >
+                <button 
+                    id="startButton" 
+                    onclick="startDiagnosis()"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <i class="fas fa-search mr-2"></i>
+                    診断開始
+                </button>
+            </div>
+            <p class="mt-2 text-sm text-gray-600">
+                ※ 診断には2-3分かかります。36項目の包括的な分析を行います。
+            </p>
+        </div>
+
+        <!-- 診断中セクション（初期非表示） -->
+        <div id="progressSection" class="hidden">
+            <div class="bg-white rounded-lg shadow p-6 mb-8">
+                <div class="flex items-center mb-4">
+                    <div class="spinner mr-4"></div>
+                    <div>
+                        <h3 class="text-lg font-semibold">診断実行中...</h3>
+                        <p class="text-sm text-gray-600" id="progressMessage">初期化中...</p>
+                    </div>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="progressBar" class="bg-blue-600 h-3 rounded-full progress-animation" style="width: 0%"></div>
+                </div>
+                <div class="mt-4 grid grid-cols-4 gap-4">
+                    <div class="text-center p-2 rounded" id="progress-infrastructure">
+                        <i class="fas fa-server text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm">インフラ＆パフォーマンス</p>
+                    </div>
+                    <div class="text-center p-2 rounded" id="progress-content">
+                        <i class="fas fa-file-alt text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm">コンテンツ＆構造</p>
+                    </div>
+                    <div class="text-center p-2 rounded" id="progress-visibility">
+                        <i class="fas fa-search text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm">可視性＆発見性</p>
+                    </div>
+                    <div class="text-center p-2 rounded" id="progress-aiReadiness">
+                        <i class="fas fa-robot text-3xl text-gray-400 mb-2"></i>
+                        <p class="text-sm">AI＆未来対応</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 診断結果セクション（初期非表示） -->
+        <div id="resultsSection" class="hidden">
+            <!-- 総合スコア -->
+            <div class="bg-white rounded-lg shadow p-6 mb-8 slide-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center">
+                            <i class="fas fa-cogs text-blue-600 mr-3"></i>
+                            <span id="diagnosisResultTitle">テクニカル診断結果</span>
+                        </h2>
+                        <p class="text-sm text-gray-600 mt-1" id="diagnosisResultSubtitle">
+                            技術的観点から9カテゴリー×4項目（計36項目）を評価
+                        </p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="toggleExpandedView()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-expand-alt mr-2"></i>
+                            全項目を表示
+                        </button>
+                        <button onclick="downloadAllReports()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                            <i class="fas fa-download mr-2"></i>
+                            レポートをダウンロード
+                        </button>
+                        <button onclick="resetDiagnosis()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-redo mr-2"></i>
+                            新規診断
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- テクニカル総合スコア表示 -->
+                    <div class="text-center">
+                        <h3 class="text-lg font-semibold mb-2">テクニカル総合スコア</h3>
+                        <p class="text-xs text-gray-500 mb-4">36項目の技術評価平均点</p>
+                        <div class="relative inline-block">
+                            <svg width="200" height="200" class="transform -rotate-90">
+                                <circle cx="100" cy="100" r="80" stroke="#E5E7EB" stroke-width="20" fill="none"></circle>
+                                <circle 
+                                    id="scoreCircle"
+                                    cx="100" cy="100" r="80" 
+                                    stroke="#3B82F6" 
+                                    stroke-width="20" 
+                                    fill="none"
+                                    stroke-dasharray="502"
+                                    stroke-dashoffset="502"
+                                    class="score-circle"
+                                ></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div>
+                                    <div class="text-5xl font-bold" id="totalScore">0</div>
+                                    <div class="text-sm text-gray-600">/ 100点</div>
+                                    <div class="text-xs mt-1">
+                                        <span id="technicalGrade" class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100">評価中</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-xs text-gray-600 space-y-1">
+                            <div>90-100点: S級（最優秀）</div>
+                            <div>70-89点: A級（優秀）</div>
+                            <div>50-69点: B級（良好）</div>
+                            <div>30-49点: C級（要改善）</div>
+                            <div>0-29点: D級（緊急対応）</div>
+                        </div>
+                    </div>
+                    
+                    <!-- サマリー統計 -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-4">診断サマリー</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">診断項目数</span>
+                                <span class="font-semibold">36項目</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-check-circle text-green-600 mr-1"></i>
+                                    合格項目
+                                </span>
+                                <span class="font-semibold" id="passedItems">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-1"></i>
+                                    警告項目
+                                </span>
+                                <span class="font-semibold" id="warningItems">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">
+                                    <i class="fas fa-times-circle text-red-600 mr-1"></i>
+                                    要改善項目
+                                </span>
+                                <span class="font-semibold" id="criticalItems">0</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">診断時間</span>
+                                <span class="font-semibold" id="executionTime">0秒</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カテゴリー別結果 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- インフラ＆パフォーマンス -->
+                <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('infrastructure')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-server text-2xl text-blue-600"></i>
+                        </div>
+                        <h3 class="font-semibold">インフラ＆パフォーマンス</h3>
+                    </div>
+                    <div class="text-3xl font-bold mb-2" id="infrastructureScore">0</div>
+                    <div class="text-sm text-gray-600 mb-1" id="infrastructureDesc">技術的基盤の評価</div>
+                    <div class="text-xs text-gray-500 mb-2" id="infrastructureItems">ページ速度、レスポンシブ、HTTPS設定</div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="infrastructureBar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-3 text-xs">
+                        <span class="text-green-600" id="infrastructurePassed">0</span> 合格 / 
+                        <span class="text-yellow-600" id="infrastructureWarning">0</span> 警告 / 
+                        <span class="text-red-600" id="infrastructureCritical">0</span> 要改善
+                    </div>
+                </div>
+
+                <!-- コンテンツ＆構造 -->
+                <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('content')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-file-alt text-2xl text-green-600"></i>
+                        </div>
+                        <h3 class="font-semibold">コンテンツ＆構造</h3>
+                    </div>
+                    <div class="text-3xl font-bold mb-2" id="contentScore">0</div>
+                    <div class="text-sm text-gray-600 mb-1" id="contentDesc">情報の品質と組織化</div>
+                    <div class="text-xs text-gray-500 mb-2" id="contentItems">HTML構造、コンテンツ品質、E-E-A-T</div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="contentBar" class="bg-green-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-3 text-xs">
+                        <span class="text-green-600" id="contentPassed">0</span> 合格 / 
+                        <span class="text-yellow-600" id="contentWarning">0</span> 警告 / 
+                        <span class="text-red-600" id="contentCritical">0</span> 要改善
+                    </div>
+                </div>
+
+                <!-- 可視性＆発見性 -->
+                <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('visibility')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-search text-2xl text-yellow-600"></i>
+                        </div>
+                        <h3 class="font-semibold">可視性＆発見性</h3>
+                    </div>
+                    <div class="text-3xl font-bold mb-2" id="visibilityScore">0</div>
+                    <div class="text-sm text-gray-600 mb-1" id="visibilityDesc">検索エンジンでの露出</div>
+                    <div class="text-xs text-gray-500 mb-2" id="visibilityItems">メタタグ、構造化データ</div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="visibilityBar" class="bg-yellow-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-3 text-xs">
+                        <span class="text-green-600" id="visibilityPassed">0</span> 合格 / 
+                        <span class="text-yellow-600" id="visibilityWarning">0</span> 警告 / 
+                        <span class="text-red-600" id="visibilityCritical">0</span> 要改善
+                    </div>
+                </div>
+
+                <!-- AI＆未来対応 -->
+                <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('aiReadiness')">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                            <i class="fas fa-robot text-2xl text-purple-600"></i>
+                        </div>
+                        <h3 class="font-semibold">AI＆未来対応</h3>
+                    </div>
+                    <div class="text-3xl font-bold mb-2" id="aiReadinessScore">0</div>
+                    <div class="text-sm text-gray-600 mb-1" id="aiReadinessDesc">次世代検索への対応</div>
+                    <div class="text-xs text-gray-500 mb-2" id="aiReadinessItems">LLMO特化対策</div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="aiReadinessBar" class="bg-purple-600 h-2 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-3 text-xs">
+                        <span class="text-green-600" id="aiReadinessPassed">0</span> 合格 / 
+                        <span class="text-yellow-600" id="aiReadinessWarning">0</span> 警告 / 
+                        <span class="text-red-600" id="aiReadinessCritical">0</span> 要改善
+                    </div>
+                </div>
+            </div>
+
+            <!-- 詳細結果エリア -->
+            <div id="detailsSection" class="hidden">
+                <!-- カテゴリー詳細がここに動的に表示される -->
+            </div>
+            
+            <!-- 全カテゴリー展開ビュー -->
+            <div id="expandedView" class="hidden">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-semibold">全カテゴリー詳細</h2>
+                        <button onclick="toggleExpandedView()" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-compress-alt mr-2"></i>
+                            コンパクト表示に戻る
+                        </button>
+                    </div>
+                    <div id="expandedContent" class="space-y-8">
+                        <!-- 全カテゴリーの詳細がここに表示される -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- カテゴリー詳細モーダル -->
+    <div id="categoryModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50" onclick="closeCategoryModal(event)">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl mx-auto mt-20 max-h-[80vh] overflow-auto" onclick="event.stopPropagation()">
+            <div class="sticky top-0 bg-white border-b px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h2 id="modalTitle" class="text-2xl font-bold"></h2>
+                    <button onclick="closeCategoryModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="modalContent" class="p-6">
+                <!-- カテゴリー詳細コンテンツ -->
+            </div>
+            <div class="sticky bottom-0 bg-white border-t px-6 py-4">
+                <button onclick="downloadCategoryReport()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <i class="fas fa-download mr-2"></i>
+                    このカテゴリーのレポートをダウンロード
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

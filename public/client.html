@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMO診断レポート - クライアントポータル</title>
+    
+    <!-- TailwindCSS CDN with multiple fallbacks -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // TailwindCSS CDN fallback
+        if (!window.tailwind) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/tailwindcss@^3/dist/tailwind.min.css';
+            document.head.appendChild(link);
+        }
+    </script>
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .score-gauge {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+        
+        .score-progress {
+            transform: rotate(-90deg);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-xl font-bold text-gray-900">LLMO診断ポータル</h1>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div id="client-info" class="text-sm text-gray-600">
+                        <span class="loading-spinner inline-block mr-2"></span>
+                        読み込み中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <button class="nav-tab py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-view="overview">
+                    <i class="fas fa-chart-line mr-2"></i>概要
+                </button>
+                <button class="nav-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-view="kpi">
+                    <i class="fas fa-analytics mr-2"></i>KPI分析
+                </button>
+                <button class="nav-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-view="technical">
+                    <i class="fas fa-cogs mr-2"></i>テクニカル
+                </button>
+                <button class="nav-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-view="reports">
+                    <i class="fas fa-file-alt mr-2"></i>レポート
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center py-12">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-600">データを読み込んでいます...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden text-center py-12">
+            <div class="text-red-500 text-6xl mb-4">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">エラーが発生しました</h2>
+            <p id="error-message" class="text-gray-600 mb-4"></p>
+            <button id="retry-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                再試行
+            </button>
+        </div>
+
+        <!-- Overview View -->
+        <div id="view-overview" class="view-content hidden">
+            <!-- Current Score Card -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900">現在のスコア</h3>
+                            <p class="text-3xl font-bold text-blue-600" id="current-score">--</p>
+                        </div>
+                        <div class="score-gauge">
+                            <svg class="score-progress" width="120" height="120">
+                                <circle cx="60" cy="60" r="50" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+                                <circle id="score-circle" cx="60" cy="60" r="50" stroke="#3b82f6" stroke-width="8" 
+                                        fill="none" stroke-dasharray="314" stroke-dashoffset="314"/>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <span id="score-percentage" class="text-2xl font-bold text-gray-900">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="score-change" class="mt-4 hidden">
+                        <div class="flex items-center">
+                            <span class="change-indicator text-sm font-medium"></span>
+                            <span class="ml-1 text-sm text-gray-600">前回から</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Grid (4カテゴリービュー) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-server text-2xl text-blue-500"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">インフラ＆パフォーマンス</dt>
+                                    <dd class="text-lg font-medium text-gray-900" id="score-infrastructure">--</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-file-alt text-2xl text-green-500"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">コンテンツ＆構造</dt>
+                                    <dd class="text-lg font-medium text-gray-900" id="score-content">--</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-search text-2xl text-yellow-500"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">可視性＆発見性</dt>
+                                    <dd class="text-lg font-medium text-gray-900" id="score-visibility">--</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-robot text-2xl text-purple-500"></i>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-gray-500 truncate">AI＆未来対応</dt>
+                                    <dd class="text-lg font-medium text-gray-900" id="score-aiReadiness">--</dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 9カテゴリー詳細ビュー -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">
+                        <i class="fas fa-list-ul text-blue-500 mr-2"></i>
+                        詳細診断結果 (9カテゴリー別)
+                    </h3>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="detailed-categories-grid">
+                        <!-- JavaScriptで動的に生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity & Next Milestone -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">最近のアクティビティ</h3>
+                        <div id="recent-activity">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">次のマイルストーン</h3>
+                        <div id="next-milestone">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Analysis View -->
+        <div id="view-kpi" class="view-content hidden">
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">成長曲線</h3>
+                    <div class="h-64">
+                        <canvas id="growth-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">成長指標</h3>
+                        <div id="growth-metrics">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">業界比較</h3>
+                        <div id="industry-benchmark">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">カテゴリー別分析</h3>
+                    <div id="category-analysis">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical View -->
+        <div id="view-technical" class="view-content hidden">
+            <div id="technical-content">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Reports View -->
+        <div id="view-reports" class="view-content hidden">
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">利用可能なレポート</h3>
+                    <div id="reports-list">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-gray-500">
+                © 2025 LLMO Analysis Platform. Powered by AI-driven optimization.
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        class ClientPortal {
+            constructor() {
+                this.clientId = this.getClientIdFromUrl();
+                this.currentView = 'overview';
+                this.data = null;
+                
+                this.init();
+            }
+            
+            getClientIdFromUrl() {
+                const pathParts = window.location.pathname.split('/');
+                const clientIndex = pathParts.indexOf('client');
+                return clientIndex !== -1 && pathParts[clientIndex + 1] ? pathParts[clientIndex + 1] : null;
+            }
+            
+            async init() {
+                this.setupEventListeners();
+                await this.loadData();
+            }
+            
+            setupEventListeners() {
+                // Navigation tabs
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        const view = e.target.closest('.nav-tab').dataset.view;
+                        this.switchView(view);
+                    });
+                });
+                
+                // Retry button
+                document.getElementById('retry-button').addEventListener('click', () => {
+                    this.loadData();
+                });
+            }
+            
+            async loadData(view = this.currentView) {
+                this.showLoading();
+                
+                try {
+                    const url = new URL(`/api/client/${this.clientId}`, window.location.origin);
+                    url.searchParams.set('view', view);
+                    
+                    // Include token from URL if present
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.has('token')) {
+                        url.searchParams.set('token', urlParams.get('token'));
+                    }
+                    
+                    const response = await fetch(url);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    this.data = await response.json();
+                    this.renderData();
+                    this.hideLoading();
+                    
+                } catch (error) {
+                    console.error('Data loading error:', error);
+                    this.showError(error.message);
+                }
+            }
+            
+            renderData() {
+                // Update client info
+                document.getElementById('client-info').innerHTML = `
+                    <strong>${this.data.client.companyName}</strong>
+                    <span class="text-gray-400 mx-2">•</span>
+                    <span>${this.data.client.domain}</span>
+                `;
+                
+                // Render current view
+                switch (this.currentView) {
+                    case 'overview':
+                        this.renderOverview();
+                        break;
+                    case 'kpi':
+                        this.renderKPI();
+                        break;
+                    case 'technical':
+                        this.renderTechnical();
+                        break;
+                    case 'reports':
+                        this.renderReports();
+                        break;
+                }
+            }
+            
+            renderOverview() {
+                const overview = this.data.overview;
+                
+                // Current score
+                document.getElementById('current-score').textContent = overview.currentScore.total;
+                document.getElementById('score-percentage').textContent = `${overview.currentScore.total}%`;
+                
+                // Score gauge animation
+                const circle = document.getElementById('score-circle');
+                const circumference = 2 * Math.PI * 50;
+                const progress = overview.currentScore.total / 100;
+                circle.style.strokeDashoffset = circumference * (1 - progress);
+                
+                // Score change
+                if (overview.scoreChange) {
+                    const changeEl = document.getElementById('score-change');
+                    const indicator = changeEl.querySelector('.change-indicator');
+                    
+                    const value = overview.scoreChange.value;
+                    const percentage = overview.scoreChange.percentage;
+                    
+                    if (value > 0) {
+                        indicator.innerHTML = `<i class="fas fa-arrow-up text-green-500"></i> +${value} (+${percentage}%)`;
+                        indicator.className = 'change-indicator text-sm font-medium text-green-600';
+                    } else if (value < 0) {
+                        indicator.innerHTML = `<i class="fas fa-arrow-down text-red-500"></i> ${value} (${percentage}%)`;
+                        indicator.className = 'change-indicator text-sm font-medium text-red-600';
+                    } else {
+                        indicator.innerHTML = `<i class="fas fa-minus text-gray-500"></i> 変化なし`;
+                        indicator.className = 'change-indicator text-sm font-medium text-gray-600';
+                    }
+                    
+                    changeEl.classList.remove('hidden');
+                }
+                
+                // Category scores
+                overview.categories.forEach(category => {
+                    const element = document.getElementById(`score-${category.key}`);
+                    if (element) {
+                        element.textContent = category.score;
+                    }
+                });
+                
+                // Recent activity
+                this.renderRecentActivity(overview.recentActivity);
+                
+                // Next milestone
+                this.renderNextMilestone(overview.nextMilestone);
+            }
+            
+            renderRecentActivity(activities) {
+                const container = document.getElementById('recent-activity');
+                
+                if (!activities || activities.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500">アクティビティはありません</p>';
+                    return;
+                }
+                
+                container.innerHTML = activities.map(activity => `
+                    <div class="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
+                        <div class="flex items-center">
+                            <div class="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+                            <span class="text-sm text-gray-900">
+                                ${activity.type === 'scheduled' ? '定期診断' : '手動診断'}
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-medium text-gray-900">${activity.score}</div>
+                            <div class="text-xs text-gray-500">${new Date(activity.date).toLocaleDateString('ja-JP')}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            renderNextMilestone(milestone) {
+                const container = document.getElementById('next-milestone');
+                
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">目標スコア</span>
+                                <span class="font-medium">${milestone.targetScore}</span>
+                            </div>
+                            <div class="mt-1 bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${milestone.currentProgress}%"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">${milestone.currentProgress}% 完了</div>
+                        </div>
+                        
+                        ${milestone.estimatedCompletion ? `
+                            <div class="text-sm text-gray-600">
+                                <i class="far fa-calendar mr-2"></i>
+                                予想達成日: ${new Date(milestone.estimatedCompletion).toLocaleDateString('ja-JP')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            renderKPI() {
+                const kpi = this.data.kpi;
+                
+                // Growth chart
+                this.renderGrowthChart(kpi.growthCurve);
+                
+                // Growth metrics
+                this.renderGrowthMetrics(kpi.growthMetrics);
+                
+                // Industry benchmark
+                this.renderIndustryBenchmark(kpi.industryBenchmark);
+                
+                // Category analysis
+                this.renderCategoryAnalysis(kpi.categoryAnalysis);
+            }
+            
+            renderGrowthChart(growthData) {
+                const ctx = document.getElementById('growth-chart').getContext('2d');
+                
+                // Destroy existing chart if exists
+                if (this.growthChart) {
+                    this.growthChart.destroy();
+                }
+                
+                this.growthChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: growthData.labels,
+                        datasets: [{
+                            label: '総合スコア',
+                            data: growthData.data,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            }
+            
+            renderGrowthMetrics(metrics) {
+                const container = document.getElementById('growth-metrics');
+                
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">改善速度</span>
+                            <span class="font-medium">${this.getVelocityLabel(metrics.improvementVelocity)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">月間成長率</span>
+                            <span class="font-medium">${metrics.monthlyGrowthRate?.toFixed(1) || 'N/A'}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">目標達成まで</span>
+                            <span class="font-medium">${metrics.timeToTarget?.months || 'N/A'}ヶ月</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderIndustryBenchmark(benchmark) {
+                const container = document.getElementById('industry-benchmark');
+                
+                container.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-gray-900">${benchmark.overall}</div>
+                            <div class="text-sm text-gray-600">業界平均</div>
+                        </div>
+                        <div class="text-sm text-center text-gray-600">
+                            あなたのスコアは業界平均を
+                            <span class="font-medium ${this.data.client.currentScore > benchmark.overall ? 'text-green-600' : 'text-red-600'}">
+                                ${Math.abs(this.data.client.currentScore - benchmark.overall)}ポイント
+                                ${this.data.client.currentScore > benchmark.overall ? '上回って' : '下回って'}います
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            renderCategoryAnalysis(analysis) {
+                const container = document.getElementById('category-analysis');
+                
+                const categories = Object.entries(analysis).map(([key, data]) => `
+                    <div class="border rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-medium">${this.getCategoryName(key)}</h4>
+                            <span class="text-lg font-bold">${data.currentScore}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-gray-600">トレンド</span>
+                            <span class="font-medium ${this.getTrendColor(data.trend)}">
+                                ${this.getTrendLabel(data.trend)}
+                            </span>
+                        </div>
+                        <div class="mt-2 bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${data.currentScore}%"></div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">${categories}</div>`;
+            }
+            
+            renderTechnical() {
+                const technical = this.data.technical;
+                const container = document.getElementById('technical-content');
+                
+                if (!technical.available) {
+                    container.innerHTML = `
+                        <div class="bg-white overflow-hidden shadow rounded-lg">
+                            <div class="p-6 text-center">
+                                <i class="fas fa-info-circle text-4xl text-gray-400 mb-4"></i>
+                                <h3 class="text-lg font-medium text-gray-900 mb-2">テクニカル分析データなし</h3>
+                                <p class="text-gray-600">${technical.message}</p>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Render technical categories and analysis
+                // This would be implemented based on the technical data structure
+                container.innerHTML = '<div class="text-center py-8">テクニカル分析の実装予定</div>';
+            }
+            
+            renderReports() {
+                const reports = this.data.reports;
+                const container = document.getElementById('reports-list');
+                
+                container.innerHTML = `
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="font-medium mb-3">ダウンロード可能なレポート</h4>
+                            <div class="space-y-2">
+                                <a href="${reports.downloadLinks.latest}" class="block p-3 border rounded-lg hover:bg-gray-50">
+                                    <div class="flex justify-between items-center">
+                                        <span>最新の診断レポート</span>
+                                        <i class="fas fa-download text-blue-500"></i>
+                                    </div>
+                                </a>
+                                <a href="${reports.downloadLinks.kpi}" class="block p-3 border rounded-lg hover:bg-gray-50">
+                                    <div class="flex justify-between items-center">
+                                        <span>KPI分析レポート</span>
+                                        <i class="fas fa-download text-blue-500"></i>
+                                    </div>
+                                </a>
+                                <a href="${reports.downloadLinks.technical}" class="block p-3 border rounded-lg hover:bg-gray-50">
+                                    <div class="flex justify-between items-center">
+                                        <span>テクニカルレポート</span>
+                                        <i class="fas fa-download text-blue-500"></i>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-medium mb-3">診断履歴</h4>
+                            <div class="space-y-2">
+                                ${reports.available.map(report => `
+                                    <div class="p-3 border rounded-lg">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <div class="font-medium">${new Date(report.date).toLocaleDateString('ja-JP')}</div>
+                                                <div class="text-sm text-gray-600">${report.type === 'scheduled' ? '定期診断' : '手動診断'}</div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="font-bold">${report.score}</div>
+                                                <div class="text-xs text-gray-500">総合スコア</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            switchView(view) {
+                // Update navigation
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.classList.remove('border-blue-500', 'text-blue-600');
+                    tab.classList.add('border-transparent', 'text-gray-500');
+                });
+                
+                document.querySelector(`[data-view="${view}"]`).classList.remove('border-transparent', 'text-gray-500');
+                document.querySelector(`[data-view="${view}"]`).classList.add('border-blue-500', 'text-blue-600');
+                
+                // Hide all views
+                document.querySelectorAll('.view-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // Show selected view
+                document.getElementById(`view-${view}`).classList.remove('hidden');
+                document.getElementById(`view-${view}`).classList.add('fade-in');
+                
+                this.currentView = view;
+                
+                // Load data for new view if needed
+                if (!this.data || !this.data[view]) {
+                    this.loadData(view);
+                }
+            }
+            
+            showLoading() {
+                document.getElementById('loading-state').classList.remove('hidden');
+                document.getElementById('error-state').classList.add('hidden');
+                document.querySelectorAll('.view-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+            }
+            
+            hideLoading() {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById(`view-${this.currentView}`).classList.remove('hidden');
+            }
+            
+            showError(message) {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('error-state').classList.remove('hidden');
+                document.getElementById('error-message').textContent = message;
+            }
+            
+            // Helper methods
+            getCategoryName(key) {
+                const names = {
+                    infrastructure: 'インフラ＆パフォーマンス',
+                    content: 'コンテンツ＆構造',
+                    visibility: '可視性＆発見性',
+                    aiReadiness: 'AI＆未来対応'
+                };
+                return names[key] || key;
+            }
+            
+            getVelocityLabel(velocity) {
+                const labels = {
+                    accelerating: '加速中',
+                    steady: '安定',
+                    slowing: '減速中',
+                    stagnant: '停滞'
+                };
+                return labels[velocity] || velocity;
+            }
+            
+            getTrendLabel(trend) {
+                const labels = {
+                    improving: '改善中',
+                    stable: '安定',
+                    declining: '低下中'
+                };
+                return labels[trend] || trend;
+            }
+            
+            getTrendColor(trend) {
+                const colors = {
+                    improving: 'text-green-600',
+                    stable: 'text-gray-600',
+                    declining: 'text-red-600'
+                };
+                return colors[trend] || 'text-gray-600';
+            }
+        }
+        
+        // Initialize the portal when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new ClientPortal();
+        });
+    </script>
+</body>
+</html>

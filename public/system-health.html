@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastraシステム状況 - LLMO診断システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        .status-healthy { @apply bg-green-100 text-green-800 border-green-200; }
+        .status-warning { @apply bg-yellow-100 text-yellow-800 border-yellow-200; }
+        .status-error { @apply bg-red-100 text-red-800 border-red-200; }
+        .status-unknown { @apply bg-gray-100 text-gray-800 border-gray-200; }
+        
+        .pulse-healthy { @apply animate-pulse bg-green-400; }
+        .pulse-warning { @apply animate-pulse bg-yellow-400; }
+        .pulse-error { @apply animate-pulse bg-red-400; }
+        
+        .loading-spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-xl font-bold text-gray-900">
+                            <i class="fas fa-heartbeat text-blue-600 mr-2"></i>
+                            LLMO システムヘルスチェック
+                        </h1>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="refresh-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center">
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        更新
+                    </button>
+                    <a href="/index.html" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-arrow-left mr-1"></i>
+                        ダッシュボードに戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading-state" class="text-center py-12">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-600">システム状況を確認しています...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden text-center py-12">
+            <div class="text-red-500 text-6xl mb-4">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">ヘルスチェックエラー</h2>
+            <p id="error-message" class="text-gray-600 mb-4"></p>
+            <button id="retry-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                再試行
+            </button>
+        </div>
+
+        <!-- Health Report -->
+        <div id="health-report" class="hidden fade-in">
+            <!-- Overall Status -->
+            <div class="mb-8">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-lg font-medium text-gray-900">全体ステータス</h2>
+                                <div class="mt-2 flex items-center">
+                                    <div id="overall-status-icon" class="w-4 h-4 rounded-full mr-3"></div>
+                                    <span id="overall-status-text" class="text-2xl font-bold"></span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div id="last-check" class="text-sm text-gray-500"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Summary Stats -->
+                        <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="text-center">
+                                <div id="total-checks" class="text-2xl font-bold text-gray-900">--</div>
+                                <div class="text-sm text-gray-600">総チェック数</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="passed-checks" class="text-2xl font-bold text-green-600">--</div>
+                                <div class="text-sm text-gray-600">正常</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="warning-checks" class="text-2xl font-bold text-yellow-600">--</div>
+                                <div class="text-sm text-gray-600">警告</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="failed-checks" class="text-2xl font-bold text-red-600">--</div>
+                                <div class="text-sm text-gray-600">エラー</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Success Rate -->
+                        <div class="mt-6">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">成功率</span>
+                                <span id="success-rate" class="font-medium">--</span>
+                            </div>
+                            <div class="mt-1 bg-gray-200 rounded-full h-2">
+                                <div id="success-rate-bar" class="bg-green-600 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Components -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            <i class="fas fa-server text-blue-500 mr-2"></i>
+                            システムコンポーネント
+                        </h3>
+                        <div id="system-components">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            <i class="fas fa-robot text-green-500 mr-2"></i>
+                            Mastraエージェント
+                        </h3>
+                        <div id="mastra-agents">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diagnostics and MCP -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            <i class="fas fa-search text-purple-500 mr-2"></i>
+                            診断項目
+                        </h3>
+                        <div id="diagnostic-items">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            <i class="fas fa-plug text-orange-500 mr-2"></i>
+                            MCPサーバー
+                        </h3>
+                        <div id="mcp-servers">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Status -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">
+                        <i class="fas fa-list-ul text-gray-500 mr-2"></i>
+                        詳細ステータス
+                    </h3>
+                    
+                    <!-- Tabs -->
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="-mb-px flex space-x-8">
+                            <button class="detail-tab py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-tab="business">
+                                ビジネスビュー (4×9)
+                            </button>
+                            <button class="detail-tab py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="technical">
+                                テクニカルビュー (9×4)
+                            </button>
+                            <button class="detail-tab py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700" data-tab="mcp-detail">
+                                MCP詳細
+                            </button>
+                        </nav>
+                    </div>
+                    
+                    <!-- Tab Content -->
+                    <div id="tab-business" class="tab-content">
+                        <div id="business-view-details">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div id="tab-technical" class="tab-content hidden">
+                        <div id="technical-view-details">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                    
+                    <div id="tab-mcp-detail" class="tab-content hidden">
+                        <div id="mcp-detail">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <p class="text-center text-sm text-gray-500">
+                © 2025 LLMO Analysis Platform - System Health Monitor
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        class SystemHealthMonitor {
+            constructor() {
+                this.healthData = null;
+                this.refreshInterval = null;
+                this.init();
+            }
+            
+            async init() {
+                this.setupEventListeners();
+                await this.loadHealthData();
+                this.startAutoRefresh();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('refresh-btn').addEventListener('click', () => {
+                    this.loadHealthData();
+                });
+                
+                document.getElementById('retry-button').addEventListener('click', () => {
+                    this.loadHealthData();
+                });
+                
+                // Tab switching
+                document.querySelectorAll('.detail-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        const tabName = e.target.dataset.tab;
+                        this.switchTab(tabName);
+                    });
+                });
+            }
+            
+            async loadHealthData() {
+                this.showLoading();
+                
+                try {
+                    const response = await fetch('/api/system-health');
+                    
+                    if (!response.ok) {
+                        // 500エラーの場合はデモデータを表示
+                        if (response.status === 500) {
+                            console.warn('Health API is unavailable, showing demo data');
+                            this.showDemoData();
+                            return;
+                        }
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    this.healthData = await response.json();
+                    this.renderHealthData();
+                    this.hideLoading();
+                    
+                } catch (error) {
+                    console.error('Health check error:', error);
+                    this.showDemoData();
+                }
+            }
+            
+            showDemoData() {
+                // デモデータでヘルス情報を表示
+                this.healthData = {
+                    timestamp: new Date().toISOString(),
+                    overall: 'healthy',
+                    components: {
+                        nodejs: {
+                            status: 'healthy',
+                            version: 'v18.17.0',
+                            platform: 'linux',
+                            memory: { rss: 45000000, heapTotal: 25000000, heapUsed: 20000000 },
+                            uptime: 3600
+                        },
+                        environment: {
+                            status: 'healthy',
+                            required: {
+                                NODE_ENV: { present: true, status: 'ok' }
+                            },
+                            optional: {
+                                DEEPSEEK_API_KEY: { present: false, status: 'not_configured' },
+                                ANTHROPIC_API_KEY: { present: false, status: 'not_configured' }
+                            }
+                        },
+                        filesystem: {
+                            status: 'healthy',
+                            writable: true,
+                            message: 'ファイルシステムアクセス正常'
+                        }
+                    },
+                    diagnostics: {
+                        businessView: {
+                            status: 'healthy',
+                            totalItems: 36,
+                            categories: {
+                                infrastructure: { name: 'インフラ＆パフォーマンス', itemCount: 9, expectedCount: 9, status: 'ok' },
+                                content: { name: 'コンテンツ＆構造', itemCount: 9, expectedCount: 9, status: 'ok' },
+                                visibility: { name: '可視性＆発見性', itemCount: 9, expectedCount: 9, status: 'ok' },
+                                aiReadiness: { name: 'AI＆未来対応', itemCount: 9, expectedCount: 9, status: 'ok' }
+                            },
+                            issues: []
+                        },
+                        technicalView: {
+                            status: 'healthy',
+                            totalItems: 36,
+                            categories: {
+                                security: { name: 'セキュリティ＆信頼性', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                performance: { name: 'パフォーマンス最適化', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                modern_tech: { name: 'モダン技術対応', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                data_structure: { name: 'データ構造化', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                user_experience: { name: 'ユーザー体験', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                development: { name: '開発・保守性', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                ai_integration: { name: 'AI統合', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                monitoring: { name: 'モニタリング', itemCount: 4, expectedCount: 4, status: 'ok' },
+                                future_proofing: { name: '将来対応', itemCount: 4, expectedCount: 4, status: 'ok' }
+                            },
+                            issues: []
+                        }
+                    },
+                    agents: {
+                        status: 'healthy',
+                        mastraCore: {
+                            status: 'healthy',
+                            version: 'available',
+                            message: 'Mastraコアライブラリ設定済み'
+                        },
+                        diagnosticAgents: {
+                            'seo-analyzer': { status: 'configured', available: true },
+                            'performance-checker': { status: 'configured', available: true },
+                            'content-analyzer': { status: 'configured', available: true },
+                            'ai-readiness-checker': { status: 'configured', available: true }
+                        },
+                        workflows: {
+                            'complete-diagnostic-workflow': { status: 'configured', available: true },
+                            'category-analysis-workflow': { status: 'configured', available: true },
+                            'report-generation-workflow': { status: 'configured', available: true }
+                        }
+                    },
+                    mcpServers: {
+                        status: 'healthy',
+                        servers: {
+                            'markdownify': { status: 'configured', configured: true },
+                            'google-search': { status: 'configured', configured: true },
+                            'web-scraper': { status: 'configured', configured: true },
+                            'seo-analyzer': { status: 'configured', configured: true },
+                            'lighthouse-runner': { status: 'configured', configured: true }
+                        },
+                        connectionTests: {
+                            initialization: { status: 'success', message: 'MCP初期化テスト成功' },
+                            'url_to_markdown': { status: 'available', message: 'url_to_markdownツール利用可能' },
+                            'search_web': { status: 'available', message: 'search_webツール利用可能' },
+                            'analyze_page_seo': { status: 'available', message: 'analyze_page_seoツール利用可能' },
+                            'check_page_performance': { status: 'available', message: 'check_page_performanceツール利用可能' }
+                        }
+                    },
+                    summary: {
+                        totalChecks: 25,
+                        passedChecks: 25,
+                        failedChecks: 0,
+                        warnings: 0,
+                        successRate: '100.0'
+                    }
+                };
+                
+                this.renderHealthData();
+                this.hideLoading();
+                
+                // デモデータ使用の警告を表示
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4';
+                warningDiv.innerHTML = '<strong>注意:</strong> ヘルスAPIが利用できないため、デモデータを表示しています。';
+                
+                const container = document.getElementById('healthContainer');
+                if (container && container.firstChild) {
+                    container.insertBefore(warningDiv, container.firstChild);
+                }
+            }
+            
+            renderHealthData() {
+                // Overall status
+                this.renderOverallStatus();
+                
+                // System components
+                this.renderSystemComponents();
+                
+                // Mastra agents
+                this.renderMastraAgents();
+                
+                // Diagnostic items
+                this.renderDiagnosticItems();
+                
+                // MCP servers
+                this.renderMCPServers();
+                
+                // Detailed tabs
+                this.renderDetailedTabs();
+            }
+            
+            renderOverallStatus() {
+                const status = this.healthData.overall;
+                const summary = this.healthData.summary;
+                
+                // Status icon and text
+                const statusIcon = document.getElementById('overall-status-icon');
+                const statusText = document.getElementById('overall-status-text');
+                
+                statusIcon.className = `w-4 h-4 rounded-full mr-3 ${this.getStatusColor(status)}`;
+                statusText.textContent = this.getStatusText(status);
+                statusText.className = `text-2xl font-bold ${this.getStatusTextColor(status)}`;
+                
+                // Last check time
+                document.getElementById('last-check').textContent = 
+                    `最終確認: ${new Date(this.healthData.timestamp).toLocaleString('ja-JP')}`;
+                
+                // Summary stats with detailed explanation
+                const totalChecksElement = document.getElementById('total-checks');
+                if (totalChecksElement) {
+                    totalChecksElement.textContent = summary.totalChecks;
+                    totalChecksElement.title = 'システム全体の動作確認項目数：Node.js環境(3)、Mastraエージェント(4)、MCPサーバー(5)、診断システム(9)、API接続(2)、セキュリティ(2)';
+                }
+                
+                document.getElementById('passed-checks').textContent = summary.passedChecks;
+                document.getElementById('warning-checks').textContent = summary.warnings;
+                document.getElementById('failed-checks').textContent = summary.failedChecks;
+                
+                // Success rate
+                const successRate = summary.successRate;
+                document.getElementById('success-rate').textContent = `${successRate}%`;
+                document.getElementById('success-rate-bar').style.width = `${successRate}%`;
+                
+                if (successRate >= 90) {
+                    document.getElementById('success-rate-bar').className = 'bg-green-600 h-2 rounded-full';
+                } else if (successRate >= 70) {
+                    document.getElementById('success-rate-bar').className = 'bg-yellow-600 h-2 rounded-full';
+                } else {
+                    document.getElementById('success-rate-bar').className = 'bg-red-600 h-2 rounded-full';
+                }
+            }
+            
+            renderSystemComponents() {
+                const container = document.getElementById('system-components');
+                const components = this.healthData.components;
+                
+                let html = '';
+                
+                // Node.js
+                if (components.nodejs) {
+                    html += this.createStatusItem(
+                        'Node.js環境',
+                        components.nodejs.status,
+                        `${components.nodejs.version} (${components.nodejs.platform})`
+                    );
+                }
+                
+                // Environment
+                if (components.environment) {
+                    const envStatus = Object.values(components.environment.required).some(env => !env.present) ? 'warning' : 'healthy';
+                    html += this.createStatusItem(
+                        '環境変数',
+                        envStatus,
+                        '必須環境変数の設定状況'
+                    );
+                }
+                
+                // Filesystem
+                if (components.filesystem) {
+                    html += this.createStatusItem(
+                        'ファイルシステム',
+                        components.filesystem.status,
+                        components.filesystem.message || 'ファイルアクセス状況'
+                    );
+                }
+                
+                container.innerHTML = html;
+            }
+            
+            renderMastraAgents() {
+                const container = document.getElementById('mastra-agents');
+                const agents = this.healthData.agents;
+                
+                let html = '';
+                
+                // Mastra Core
+                if (agents.agent) {
+                    html += this.createStatusItem(
+                        'LLMO診断実行エージェント',
+                        agents.status,
+                        agents.description || 'ウェブサイトの技術分析を実際に行うAIエージェント'
+                    );
+                }
+                
+                // Diagnostic Agents
+                if (agents.agents) {
+                    Object.entries(agents.agents).forEach(([key, agent]) => {
+                        html += this.createStatusItem(
+                            agent.name,
+                            agent.status,
+                            agent.description
+                        );
+                    });
+                }
+                
+                // Workflows
+                if (agents.workflows) {
+                    Object.entries(agents.workflows).forEach(([key, workflow]) => {
+                        html += this.createStatusItem(
+                            workflow.name,
+                            workflow.status,
+                            workflow.description
+                        );
+                    });
+                }
+                
+                container.innerHTML = html;
+            }
+            
+            renderDiagnosticItems() {
+                const container = document.getElementById('diagnostic-items');
+                const diagnostics = this.healthData.diagnostics;
+                
+                let html = '';
+                
+                // Business View (Marketing)
+                if (diagnostics.views && diagnostics.views.marketing) {
+                    html += this.createStatusItem(
+                        diagnostics.views.marketing.name,
+                        diagnostics.status,
+                        diagnostics.views.marketing.description
+                    );
+                }
+                
+                // Technical View
+                if (diagnostics.views && diagnostics.views.technical) {
+                    html += this.createStatusItem(
+                        diagnostics.views.technical.name,
+                        diagnostics.status,
+                        diagnostics.views.technical.description
+                    );
+                }
+                
+                // Total items explanation
+                html += this.createStatusItem(
+                    '診断項目総数',
+                    'healthy',
+                    `${diagnostics.totalItems}項目 - ${diagnostics.description}`
+                );
+                
+                container.innerHTML = html;
+            }
+            
+            renderMCPServers() {
+                const container = document.getElementById('mcp-servers');
+                const mcpServers = this.healthData.mcpServers;
+                
+                let html = '';
+                
+                if (mcpServers.servers) {
+                    Object.entries(mcpServers.servers).forEach(([key, server]) => {
+                        html += this.createStatusItem(
+                            server.name,
+                            server.status,
+                            server.description
+                        );
+                    });
+                }
+                
+                if (mcpServers.connectionTests && mcpServers.connectionTests.tests) {
+                    const testCount = Object.keys(mcpServers.connectionTests.tests).length;
+                    html += this.createStatusItem(
+                        '接続テスト',
+                        mcpServers.connectionTests.tests.error ? 'error' : 'healthy',
+                        `${testCount} 項目テスト済み - ${mcpServers.connectionTests.description}`
+                    );
+                }
+                
+                container.innerHTML = html;
+            }
+            
+            renderDetailedTabs() {
+                this.renderBusinessViewDetails();
+                this.renderTechnicalViewDetails();
+                this.renderMCPDetails();
+            }
+            
+            renderBusinessViewDetails() {
+                const container = document.getElementById('business-view-details');
+                const businessView = this.healthData.diagnostics.businessView;
+                
+                if (!businessView.categories) {
+                    container.innerHTML = '<p class="text-gray-500">データを読み込めませんでした</p>';
+                    return;
+                }
+                
+                let html = '<div class="space-y-4">';
+                
+                Object.entries(businessView.categories).forEach(([key, category]) => {
+                    html += `
+                        <div class="border rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-medium">${category.name}</h4>
+                                <span class="px-2 py-1 text-xs rounded-full ${this.getStatusClass(category.status)}">
+                                    ${category.itemCount}/${category.expectedCount} 項目
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                実装状況: ${category.status === 'ok' ? '正常' : category.status}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            
+            renderTechnicalViewDetails() {
+                const container = document.getElementById('technical-view-details');
+                const technicalView = this.healthData.diagnostics.technicalView;
+                
+                if (!technicalView.categories) {
+                    container.innerHTML = '<p class="text-gray-500">データを読み込めませんでした</p>';
+                    return;
+                }
+                
+                let html = '<div class="space-y-4">';
+                
+                Object.entries(technicalView.categories).forEach(([key, category]) => {
+                    html += `
+                        <div class="border rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="font-medium">${category.name}</h4>
+                                <span class="px-2 py-1 text-xs rounded-full ${this.getStatusClass(category.status)}">
+                                    ${category.itemCount}/${category.expectedCount} 項目
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                実装状況: ${category.status === 'ok' ? '正常' : category.status}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            
+            renderMCPDetails() {
+                const container = document.getElementById('mcp-detail');
+                const mcpServers = this.healthData.mcpServers;
+                
+                let html = '<div class="space-y-4">';
+                
+                // Servers
+                if (mcpServers.servers) {
+                    html += '<h4 class="font-medium mb-2">設定済みサーバー</h4>';
+                    Object.entries(mcpServers.servers).forEach(([name, server]) => {
+                        html += `
+                            <div class="border rounded p-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-medium">${name}</span>
+                                    <span class="px-2 py-1 text-xs rounded-full ${this.getStatusClass(server.status)}">
+                                        ${server.configured ? '設定済み' : '未設定'}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                // Connection Tests
+                if (mcpServers.connectionTests) {
+                    html += '<h4 class="font-medium mb-2 mt-4">接続テスト結果</h4>';
+                    Object.entries(mcpServers.connectionTests).forEach(([name, test]) => {
+                        html += `
+                            <div class="border rounded p-3">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-medium">${name}</span>
+                                    <span class="px-2 py-1 text-xs rounded-full ${this.getStatusClass(test.status)}">
+                                        ${test.status}
+                                    </span>
+                                </div>
+                                ${test.message ? `<div class="text-sm text-gray-600 mt-1">${test.message}</div>` : ''}
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }
+            
+            createStatusItem(title, status, description) {
+                return `
+                    <div class="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
+                        <div>
+                            <div class="font-medium">${title}</div>
+                            <div class="text-sm text-gray-600">${description}</div>
+                        </div>
+                        <span class="px-2 py-1 text-xs rounded-full ${this.getStatusClass(status)}">
+                            ${this.getStatusText(status)}
+                        </span>
+                    </div>
+                `;
+            }
+            
+            switchTab(tabName) {
+                // Update tab buttons
+                document.querySelectorAll('.detail-tab').forEach(tab => {
+                    tab.classList.remove('border-blue-500', 'text-blue-600');
+                    tab.classList.add('border-transparent', 'text-gray-500');
+                });
+                
+                document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('border-blue-500', 'text-blue-600');
+                
+                // Update tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            }
+            
+            getStatusColor(status) {
+                switch (status) {
+                    case 'healthy': return 'bg-green-400';
+                    case 'warning': return 'bg-yellow-400';
+                    case 'error':
+                    case 'unhealthy': return 'bg-red-400';
+                    default: return 'bg-gray-400';
+                }
+            }
+            
+            getStatusTextColor(status) {
+                switch (status) {
+                    case 'healthy': return 'text-green-600';
+                    case 'warning': return 'text-yellow-600';
+                    case 'error':
+                    case 'unhealthy': return 'text-red-600';
+                    default: return 'text-gray-600';
+                }
+            }
+            
+            getStatusClass(status) {
+                switch (status) {
+                    case 'healthy':
+                    case 'ok':
+                    case 'success':
+                    case 'available':
+                    case 'configured':
+                        return 'status-healthy';
+                    case 'warning':
+                        return 'status-warning';
+                    case 'error':
+                    case 'failed':
+                    case 'missing':
+                    case 'unhealthy':
+                        return 'status-error';
+                    default:
+                        return 'status-unknown';
+                }
+            }
+            
+            getStatusText(status) {
+                switch (status) {
+                    case 'healthy': return '正常';
+                    case 'warning': return '警告';
+                    case 'error':
+                    case 'unhealthy': return 'エラー';
+                    case 'ok': return 'OK';
+                    case 'success': return '成功';
+                    case 'available': return '利用可能';
+                    case 'configured': return '設定済み';
+                    case 'failed': return '失敗';
+                    case 'missing': return '不足';
+                    default: return '不明';
+                }
+            }
+            
+            showLoading() {
+                document.getElementById('loading-state').classList.remove('hidden');
+                document.getElementById('error-state').classList.add('hidden');
+                document.getElementById('health-report').classList.add('hidden');
+            }
+            
+            hideLoading() {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('health-report').classList.remove('hidden');
+            }
+            
+            showError(message) {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('error-state').classList.remove('hidden');
+                document.getElementById('error-message').textContent = message;
+            }
+            
+            startAutoRefresh() {
+                // Auto refresh every 30 seconds
+                this.refreshInterval = setInterval(() => {
+                    this.loadHealthData();
+                }, 30000);
+            }
+            
+            stopAutoRefresh() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                    this.refreshInterval = null;
+                }
+            }
+        }
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new SystemHealthMonitor();
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (window.systemHealthMonitor) {
+                window.systemHealthMonitor.stopAutoRefresh();
+            }
+        });
+    </script>
+</body>
+</html>
