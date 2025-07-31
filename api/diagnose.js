@@ -419,21 +419,23 @@ function generateDiagnosticResults(analysis) {
           id: 'title_optimization',
           name: 'タイトルタグの最適化',
           score: calculateTitleScore(metaTags.title, metaTags.titleLength),
-          actualCode: metaTags.title ? `<title>${metaTags.title}</title>` : '未設定',
+          actualCode: metaTags.title ? `<!-- 実際のHTMLから抽出 -->\n<title>${metaTags.title}</title>\n<!-- 文字数: ${metaTags.titleLength}文字 -->` : '<!-- HTMLから<title>タグが検出されませんでした -->',
           issues: getTitleIssues(metaTags.title, metaTags.titleLength)
         },
         {
           id: 'meta_description',
           name: 'メタディスクリプションの最適化',
           score: calculateDescriptionScore(metaTags.description, metaTags.descriptionLength),
-          actualCode: metaTags.description ? `<meta name="description" content="${metaTags.description}">` : '未設定',
+          actualCode: metaTags.description ? `<!-- 実際のHTMLから抽出 -->\n<meta name="description" content="${metaTags.description}">\n<!-- 文字数: ${metaTags.descriptionLength}文字 -->` : '<!-- HTMLから<meta name="description">が検出されませんでした -->',
           issues: getDescriptionIssues(metaTags.description, metaTags.descriptionLength)
         },
         {
           id: 'og_tags',
           name: 'OGPタグの実装',
           score: calculateOGScore(metaTags),
-          actualCode: generateOGCode(metaTags),
+          actualCode: metaTags.ogTitle || metaTags.ogDescription || metaTags.ogImage ? 
+            `<!-- 実際のHTMLから抽出されたOGPタグ -->\n${generateOGCodeWithComments(metaTags)}` : 
+            '<!-- HTMLからOGPタグが検出されませんでした -->',
           issues: getOGIssues(metaTags)
         },
         {
@@ -454,6 +456,9 @@ function generateDiagnosticResults(analysis) {
           id: 'h1_usage',
           name: 'H1タグの使用',
           score: calculateH1Score(htmlStructure.h1Count),
+          actualCode: htmlStructure.h1Count > 0 ? 
+            `<!-- 実際のHTMLから検出されたH1タグ（${htmlStructure.h1Count}個）-->\n${analysis.seo_metrics?.headings?.h1?.map((h1, i) => `<h1>${h1}</h1> <!-- H1タグ${i + 1} -->`).join('\n') || '<h1>内容を取得できませんでした</h1>'}` : 
+            '<!-- HTMLからH1タグが検出されませんでした -->',
           issues: getH1Issues(htmlStructure.h1Count)
         },
         {
@@ -567,6 +572,14 @@ function generateOGCode(metaTags) {
   if (metaTags.ogDescription) ogTags.push(`<meta property="og:description" content="${metaTags.ogDescription}">`);
   if (metaTags.ogImage) ogTags.push(`<meta property="og:image" content="${metaTags.ogImage}">`);
   return ogTags.length > 0 ? ogTags.join('\\n') : '未設定';
+}
+
+function generateOGCodeWithComments(metaTags) {
+  const ogTags = [];
+  if (metaTags.ogTitle) ogTags.push(`<meta property="og:title" content="${metaTags.ogTitle}"> <!-- Facebook・Twitter等のSNS表示用タイトル -->`);
+  if (metaTags.ogDescription) ogTags.push(`<meta property="og:description" content="${metaTags.ogDescription}"> <!-- SNS共有時の説明文 -->`);
+  if (metaTags.ogImage) ogTags.push(`<meta property="og:image" content="${metaTags.ogImage}"> <!-- SNS共有時のサムネイル画像 -->`);
+  return ogTags.length > 0 ? ogTags.join('\n') : '';
 }
 
 function getOGIssues(metaTags) {
@@ -685,31 +698,31 @@ function getCategoryIssue(category, index) {
 function getCategoryFact(category, index, analysis) {
   const facts = {
     'content': [
-      `コンテンツ長: ${analysis.htmlLength}文字`,
-      `H1タグ: ${analysis.htmlStructure.h1Count}個`,
-      `画像数: ${analysis.htmlStructure.imageCount}個`,
-      `セマンティック要素: ${analysis.htmlStructure.hasArticle ? 'あり' : 'なし'}`
+      `実際のHTMLサイズ: ${analysis.htmlLength}文字\n実際のワード数: ${analysis.seo_metrics?.word_count || 0}語`,
+      `実際のH1タグ: ${analysis.seo_metrics?.headings?.h1?.join(', ') || '未検出'}`,
+      `実際の画像数: ${analysis.seo_metrics?.images?.length || 0}個 (alt設定済み: ${analysis.seo_metrics?.images?.filter(img => img.hasAlt)?.length || 0}個)`,
+      `実際のセマンティック要素: ${analysis.htmlStructure.hasArticle ? '<article>タグあり' : 'article要素なし'}, ${analysis.htmlStructure.hasSection ? '<section>タグあり' : 'section要素なし'}`
     ],
     'eat': [
-      `タイトル設定: ${analysis.metaTags.title ? 'あり' : 'なし'}`,
-      `HTTPS: ${analysis.seoFeatures.hasHttps ? 'あり' : 'なし'}`,
-      `セキュリティヘッダー: ${analysis.seoFeatures.hasCSP ? 'CSP設定済み' : '未設定'}`,
-      `構造化データ: ${analysis.structuredData.types.length}種類`
+      `実際のタイトル: ${analysis.seo_metrics?.title || '未設定'}`,
+      `実際のHTTPS設定: ${analysis.seoFeatures.hasHttps ? 'https://で接続確認済み' : 'http://接続（非暗号化）'}`,
+      `実際のセキュリティヘッダー: ${analysis.seoFeatures.hasCSP ? 'Content-Security-Policy設定済み' : 'CSP未設定'}, ${analysis.seoFeatures.hasHSTS ? 'HSTS有効' : 'HSTS無効'}`,
+      `実際の構造化データ: ${analysis.structured_data?.summary?.types_found?.join(', ') || '未検出'}（${analysis.structured_data?.summary?.total_json_ld || 0}ブロック）`
     ],
     'speed': [
-      `HTTPS: ${analysis.seoFeatures.hasHttps ? '有効' : '無効'}`,
-      `HTMLサイズ: ${(analysis.htmlLength / 1024).toFixed(1)}KB`,
-      `画像最適化: ${analysis.htmlStructure.imagesWithAlt}/${analysis.htmlStructure.imageCount}`,
-      `セキュリティ: ${analysis.seoFeatures.hasHSTS ? 'HSTS有効' : 'HSTS無効'}`
+      `実際の接続プロトコル: ${analysis.seoFeatures.hasHttps ? 'HTTPS（暗号化済み）' : 'HTTP（非暗号化）'}`,
+      `実際のHTMLファイルサイズ: ${(analysis.htmlLength / 1024).toFixed(1)}KB`,
+      `実際の画像最適化状況: 全${analysis.seo_metrics?.images?.length || 0}枚中${analysis.seo_metrics?.images?.filter(img => img.hasAlt)?.length || 0}枚にalt属性設定済み`,
+      `実際のパフォーマンス推定: ${analysis.performance_metrics?.load_time || 'N/A'}ms（推定Lighthouseスコア: ${analysis.lighthouse?.performance || 'N/A'}）`
     ],
     'responsive': [
-      `ビューポート: ${analysis.metaTags.hasViewport ? '設定済み' : '未設定'}`,
-      `モバイル最適化: ${analysis.htmlStructure.hasNav ? '対応' : '要改善'}`,
-      `画像alt属性: ${analysis.htmlStructure.imagesWithAlt}個設定済み`,
-      `レスポンシブ要素: ${analysis.htmlStructure.hasSection ? 'あり' : 'なし'}`
+      `実際のビューポート設定: ${analysis.seo_metrics?.viewport !== 'missing' ? 'viewport設定確認済み' : 'viewport未設定'}`,
+      `実際のモバイル要素: ${analysis.htmlStructure.hasNav ? '<nav>タグ確認' : 'nav要素なし'}`,
+      `実際の画像alt実装: ${analysis.seo_metrics?.images?.filter(img => img.hasAlt)?.length || 0}個/全${analysis.seo_metrics?.images?.length || 0}個の画像`,
+      `実際のレスポンシブ構造: ${analysis.htmlStructure.hasSection ? '<section>要素確認' : 'section要素なし'}`
     ]
   };
-  return facts[category] ? facts[category][index - 1] : '分析中';
+  return facts[category] ? facts[category][index - 1] : `実際の分析データ取得中...`;
 }
 
 function generateHTTPSItems(seoFeatures) {
@@ -804,6 +817,17 @@ function formatResults(categories, analysis) {
       images: analysis.htmlStructure.imageCount,
       structuredDataTypes: analysis.structuredData.types || [],
       llmsTxtFound: analysis.seoFeatures.hasLLMsTxt,
+      actualHTMLExtract: {
+        titleTag: analysis.basic_info?.title ? `<title>${analysis.basic_info.title}</title>` : '未検出',
+        metaDescription: analysis.seo_metrics?.meta_description ? `<meta name="description" content="${analysis.seo_metrics.meta_description}">` : '未検出',
+        h1Tags: analysis.seo_metrics?.headings?.h1 || [],
+        h2Count: analysis.seo_metrics?.headings?.h2?.length || 0,
+        h3Count: analysis.seo_metrics?.headings?.h3?.length || 0,
+        structuredDataBlocks: analysis.structured_data?.json_ld?.length || 0,
+        schemaTypes: analysis.structured_data?.summary?.types_found || [],
+        imageCount: analysis.seo_metrics?.images?.length || 0,
+        imagesWithAlt: analysis.seo_metrics?.images?.filter(img => img.hasAlt)?.length || 0
+      },
       httpHeaders: {
         'content-type': 'text/html',
         'server': 'analyzed',

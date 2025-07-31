@@ -27,7 +27,7 @@ const DIAGNOSIS_TYPES = {
     },
     business: {
         name: 'マーケティング診断',
-        endpoint: '/diagnose-business',
+        endpoint: '/diagnose',  // 同じAPIを使用、type=businessで識別
         description: '経営的観点から4カテゴリー×9項目で評価'
     }
 };
@@ -119,7 +119,10 @@ async function startDiagnosis() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ 
+                url: url,
+                type: currentDiagnosisType 
+            })
         });
         
         if (!response.ok) {
@@ -196,7 +199,6 @@ function displayResults(results) {
     
     // カテゴリー別に処理
     if (currentDiagnosisType === 'technical') {
-        displayTechnicalResults(results);
         displayTechnicalCategoryResults(results.categories);
     } else {
         displayBusinessResults(results);
@@ -296,7 +298,7 @@ function displayAllItemsInTable(results) {
                         <div class="mb-2">${issues}</div>
                         ${item.actualCode ? `
                             <details class="mb-2">
-                                <summary class="cursor-pointer text-blue-600 hover:text-blue-800">現在のコード</summary>
+                                <summary class="cursor-pointer text-blue-600 hover:text-blue-800">実際の検出コード</summary>
                                 <pre class="bg-gray-100 p-2 mt-1 text-xs overflow-x-auto"><code>${item.actualCode}</code></pre>
                             </details>
                         ` : ''}
@@ -853,19 +855,25 @@ function displayTechnicalCategoryResults(categories) {
             // 実際のスコア計算（APIレスポンスに合わせて修正）
             let totalScore = 0;
             let maxScore = 0;
-            if (category.items) {
+            console.log(`カテゴリー ${categoryKey}:`, category);
+            
+            if (category.items && Array.isArray(category.items)) {
                 category.items.forEach(item => {
-                    totalScore += item.score || 0;
+                    const itemScore = parseInt(item.score) || 0;
+                    totalScore += itemScore;
                     maxScore += 100;
+                    console.log(`  ${item.name}: ${itemScore}点`);
                 });
             }
             const score = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-            const passed = category.items ? category.items.filter(item => (item.score || 0) >= 70).length : 0;
+            const passed = category.items ? category.items.filter(item => (parseInt(item.score) || 0) >= 70).length : 0;
             const warning = category.items ? category.items.filter(item => {
-                const itemScore = item.score || 0;
+                const itemScore = parseInt(item.score) || 0;
                 return itemScore >= 40 && itemScore < 70;
             }).length : 0;
-            const critical = category.items ? category.items.filter(item => (item.score || 0) < 40).length : 0;
+            const critical = category.items ? category.items.filter(item => (parseInt(item.score) || 0) < 40).length : 0;
+            
+            console.log(`${categoryKey}: ${score}点 (${passed}合格/${warning}警告/${critical}要改善)`);
             
             html += `
                 <div class="category-card bg-white rounded-lg shadow p-6 cursor-pointer" onclick="showCategoryDetails('${categoryKey}')">
@@ -875,7 +883,7 @@ function displayTechnicalCategoryResults(categories) {
                         </div>
                         <h3 class="font-semibold text-sm">${displayInfo.name}</h3>
                     </div>
-                    <div class="text-3xl font-bold mb-2">${score}</div>
+                    <div class="text-3xl font-bold mb-2">${score}点</div>
                     <div class="text-sm text-gray-600 mb-1">${displayInfo.description}</div>
                     <div class="text-xs text-gray-500 mb-2">${displayInfo.items}</div>
                     <div class="w-full bg-gray-200 rounded-full h-2">
@@ -1272,9 +1280,11 @@ function toggleExpandedView() {
         displayAllItemsInTable(currentResults);
         
         // カテゴリーカードを非表示
-        const categoryCards = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4.gap-6.mb-8');
-        if (categoryCards) {
+        const categoryCards = document.getElementById('categoryCards') || document.querySelector('.grid');
+        if (categoryCards && categoryCards.children.length > 0) {
+            // カテゴリーカードが含まれている親要素を非表示
             categoryCards.style.display = 'none';
+            console.log('カテゴリーカードを非表示にしました');
         }
         
         // ボタンテキストを変更
@@ -1306,16 +1316,18 @@ function toggleExpandedView() {
 function restoreCompactView() {
     console.log('コンパクト表示に戻ります');
     
-    // 表を非表示
-    const tableContainer = document.getElementById('categoryCards');
-    if (tableContainer) {
-        tableContainer.innerHTML = '';
-    }
+    console.log('コンパクト表示復元: 現在の結果', currentResults);
     
     // カテゴリーカードを再表示
-    const categoryCards = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4.gap-6.mb-8');
-    if (categoryCards) {
-        categoryCards.style.display = 'grid';
+    if (currentResults && currentDiagnosisType === 'technical') {
+        displayTechnicalCategoryResults(currentResults.categories);
+        console.log('テクニカル診断カテゴリーカードを再表示しました');
+    }
+    
+    // 表示されていた表は削除
+    const allItemsTable = document.getElementById('allItemsTable');
+    if (allItemsTable && allItemsTable.parentNode) {
+        allItemsTable.parentNode.parentNode.parentNode.remove(); // table -> tbody -> div を削除
     }
     
     // ボタンテキストを元に戻す
@@ -1522,6 +1534,77 @@ function downloadAllReports() {
     }
 }
 
+/**
+ * システムヘルスチェックを実行
+ */
+async function performHealthCheck() {
+    try {
+        console.log('[Health Check] システム状態を確認中...');
+        
+        const response = await fetch(`${API_BASE}/health`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Health check failed: ${response.status}`);
+        }
+        
+        const healthData = await response.json();
+        console.log('[Health Check] システム正常:', healthData);
+        
+        // ヘルス状態をUIに表示
+        updateHealthStatus(healthData);
+        
+    } catch (error) {
+        console.error('[Health Check] システムエラー:', error);
+        updateHealthStatus(null, error);
+    }
+}
+
+/**
+ * ヘルス状態をUIに更新
+ */
+function updateHealthStatus(healthData, error) {
+    // ページタイトル下にステータス表示を追加
+    const headerElement = document.querySelector('h1');
+    if (!headerElement) return;
+    
+    // 既存のステータス表示を削除
+    const existingStatus = document.getElementById('systemStatus');
+    if (existingStatus) {
+        existingStatus.remove();
+    }
+    
+    const statusElement = document.createElement('div');
+    statusElement.id = 'systemStatus';
+    statusElement.className = 'mt-2 text-sm';
+    
+    if (error) {
+        statusElement.innerHTML = `
+            <div class="flex items-center text-red-600">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <span>システム状態: 警告 (${error.message})</span>
+            </div>
+        `;
+    } else if (healthData) {
+        const isHealthy = healthData.status === 'healthy';
+        const statusColor = isHealthy ? 'text-green-600' : 'text-yellow-600';
+        const statusIcon = isHealthy ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        statusElement.innerHTML = `
+            <div class="flex items-center ${statusColor}">
+                <i class="fas ${statusIcon} mr-2"></i>
+                <span>システム状態: ${isHealthy ? '正常' : '注意'} | ${healthData.version} | MCP統合: ${healthData.mcpIntegration.status === 'operational' ? '稼働中' : '停止'} | 応答時間: ${healthData.metrics.responseTime}ms</span>
+            </div>
+        `;
+    }
+    
+    headerElement.insertAdjacentElement('afterend', statusElement);
+}
+
 // ページ読み込み時の初期化
 document.addEventListener('DOMContentLoaded', () => {
     // エンターキーで診断開始
@@ -1536,4 +1619,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // デフォルトでテクニカル診断を選択
     selectDiagnosisType('technical');
+    
+    // システムヘルスチェックを実行
+    performHealthCheck();
 });/* FORCE DEPLOY 1753898061 */
