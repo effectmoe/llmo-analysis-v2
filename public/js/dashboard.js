@@ -1622,4 +1622,4 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // システムヘルスチェックを実行
     performHealthCheck();
-});/* FORCE DEPLOY 1753898061 */
+});/* FORCE DEPLOY 1753900561 */
