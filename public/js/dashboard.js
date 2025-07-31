@@ -250,8 +250,44 @@ function displayTechnicalResults(results) {
  * 全36項目を1つの表に表示
  */
 function displayAllItemsInTable(results) {
+    console.log('全項目表示を実行:', results);
+    
+    // カテゴリーカードエリアを一時的に非表示
+    const categoryCardsContainer = document.getElementById('categoryCards');
+    if (!categoryCardsContainer) {
+        console.error('categoryCardsコンテナが見つかりません');
+        return;
+    }
+    
+    // 既存のカテゴリーカードを保存
+    const existingCards = categoryCardsContainer.innerHTML;
+    categoryCardsContainer.setAttribute('data-original-content', existingCards);
+    
+    // 全項目表の作成
+    categoryCardsContainer.innerHTML = `
+        <div class="col-span-4">
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="border border-gray-300 px-4 py-2 text-left">項目</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">評価</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">スコア</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">改善提案</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allItemsTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+    
     const tbody = document.getElementById('allItemsTable');
-    if (!tbody) return;
+    if (!tbody) {
+        console.error('tbody要素が作成されませんでした');
+        return;
+    }
     
     let html = '';
     let categoryIndex = 1;
@@ -601,31 +637,83 @@ function showCategoryDetails(categoryKey) {
     if (!currentResults) return;
     
     currentCategory = categoryKey;
+    console.log('カテゴリー詳細表示:', categoryKey);
     
-    let categoryData;
-    let categoryInfo;
-    
-    if (currentDiagnosisType === 'technical') {
-        // テクニカル診断の場合は集約処理
-        const results = aggregateToBusinessCategories(currentResults);
-        categoryData = results[categoryKey];
-        categoryInfo = BUSINESS_CATEGORIES[categoryKey];
-    } else {
-        // ビジネス診断の場合はそのまま使用
-        const category = currentResults.categories[categoryKey];
-        categoryData = {
-            items: category.items,
-            totalScore: categoryTotal,
-            maxScore: categoryMax
-        };
-        categoryInfo = {
-            name: category.name,
-            icon: BUSINESS_CATEGORIES[categoryKey].icon,
-            color: BUSINESS_CATEGORIES[categoryKey].color
-        };
+    // カテゴリーデータを取得
+    const category = currentResults.categories[categoryKey];
+    if (!category || !category.items) {
+        console.error('カテゴリーデータが見つかりません:', categoryKey);
+        return;
     }
     
-    if (!categoryData || categoryData.items.length === 0) return;
+    // カテゴリー情報を取得（テクニカル診断用）
+    const categoryDisplayMap = {
+        'metaTags': {
+            name: 'メタタグの最適化',
+            icon: 'fas fa-tags',
+            color: 'blue'
+        },
+        'htmlStructure': {
+            name: 'HTML構造の最適化',
+            icon: 'fas fa-code',
+            color: 'green'
+        },
+        'structuredData': {
+            name: '構造化データ実装',
+            icon: 'fas fa-database',
+            color: 'purple'
+        },
+        'contentQuality': {
+            name: 'コンテンツの質',
+            icon: 'fas fa-file-alt',
+            color: 'yellow'
+        },
+        'eatElements': {
+            name: 'E-E-A-T要素',
+            icon: 'fas fa-shield-alt',
+            color: 'red'
+        },
+        'pageSpeed': {
+            name: 'ページ速度',
+            icon: 'fas fa-tachometer-alt',
+            color: 'orange'
+        },
+        'responsiveDesign': {
+            name: 'レスポンシブデザイン',
+            icon: 'fas fa-mobile-alt',
+            color: 'teal'
+        },
+        'httpsConfig': {
+            name: 'HTTPS設定',
+            icon: 'fas fa-lock',
+            color: 'gray'
+        },
+        'llmoOptimization': {
+            name: 'LLMO特化対策',
+            icon: 'fas fa-robot',
+            color: 'indigo'
+        }
+    };
+    
+    const categoryInfo = categoryDisplayMap[categoryKey] || {
+        name: category.name || categoryKey,
+        icon: 'fas fa-chart-bar',
+        color: 'gray'
+    };
+    
+    // スコア計算
+    let totalScore = 0;
+    let maxScore = 0;
+    category.items.forEach(item => {
+        totalScore += parseInt(item.score) || 0;
+        maxScore += 100;
+    });
+    
+    const categoryData = {
+        items: category.items,
+        totalScore: totalScore,
+        maxScore: maxScore
+    };
     
     // モーダルタイトル
     document.getElementById('modalTitle').innerHTML = `
@@ -783,63 +871,90 @@ function displayTechnicalCategoryResults(categories) {
             description: 'SEOに重要なHTMLメタタグの設定状況を診断',
             items: 'タイトルタグ（30-60文字推奨）、メタディスクリプション（120-160文字推奨）、OGPタグ（SNS共有用）、カノニカルタグ（重複コンテンツ対策）',
             icon: 'fas fa-tags',
-            color: 'blue'
+            color: 'blue',
+            mcpServers: ['Chrome MCP'],
+            agents: ['SEO分析エージェント'],
+            mcpDescription: 'Chrome MCPのPuppeteer機能でメタタグを抽出・分析'
         },
         'htmlStructure': {
             name: 'HTML構造の最適化',
             description: 'HTMLの構造的な品質と accessibility を診断',
             items: 'H1タグ（1ページに1つ推奨）、見出し階層（H1→H2→H3の順序）、セマンティック要素（article、section等）、画像のalt属性（視覚障害者対応）',
             icon: 'fas fa-code',
-            color: 'green'
+            color: 'green',
+            mcpServers: ['Chrome MCP'],
+            agents: ['HTML構造分析エージェント'],
+            mcpDescription: 'Chrome MCPでDOM構造を解析、見出し階層をチェック'
         },
         'structuredData': {
             name: '構造化データ (Schema.org)',
             description: 'Googleのリッチスニペット表示のための構造化データを診断',
             items: 'JSON-LD形式の実装、Organization（組織情報）、LocalBusiness（ローカルビジネス）、WebSite（サイト情報）、FAQPage（よくある質問）',
             icon: 'fas fa-database',
-            color: 'purple'
+            color: 'purple',
+            mcpServers: ['Schemantra', 'Google Rich Results'],
+            agents: ['構造化データ検証エージェント'],
+            mcpDescription: 'Schemantraで1400+のSchema.orgタイプを検証、Google Rich Resultsでリッチスニペット適格性判定'
         },
         'contentQuality': {
             name: 'コンテンツの質',
             description: 'ページコンテンツの品質と価値を総合的に診断',
             items: 'コンテンツ長（300文字以上推奨）、読みやすさ（適切な段落分け）、独自性（他サイトとの差別化）、マルチメディア要素（画像・動画の活用）',
             icon: 'fas fa-file-alt',
-            color: 'yellow'
+            color: 'yellow',
+            mcpServers: ['Chrome MCP'],
+            agents: ['コンテンツ品質評価エージェント'],
+            mcpDescription: 'Chrome MCPでコンテンツ長、読みやすさ、マルチメディア要素を分析'
         },
         'eatElements': {
             name: 'E-E-A-T要素',
             description: 'GoogleのSEO評価基準である E-E-A-T を診断',
             items: 'Expertise（専門性：著者の専門知識）、Authoritativeness（権威性：業界での信頼度）、Trustworthiness（信頼性：サイトの安全性）、Experience（経験：実体験に基づく内容）',
             icon: 'fas fa-shield-alt',
-            color: 'red'
+            color: 'red',
+            mcpServers: ['Chrome MCP', 'Schemantra'],
+            agents: ['E-E-A-T分析エージェント'],
+            mcpDescription: 'Chrome MCPで著者情報、Schemantraで信頼性シグナルを検出'
         },
         'pageSpeed': {
             name: 'ページ速度',
             description: 'ページの表示速度とパフォーマンスを診断',
             items: '読み込み速度（3秒以内推奨）、Core Web Vitals（LCP・FID・CLS）、モバイルパフォーマンス、サーバー応答時間',
             icon: 'fas fa-tachometer-alt',
-            color: 'orange'
+            color: 'orange',
+            mcpServers: ['Chrome MCP'],
+            agents: ['パフォーマンス分析エージェント'],
+            mcpDescription: 'Chrome MCPのLighthouse機能でCore Web Vitals、読み込み速度を測定'
         },
         'responsiveDesign': {
             name: 'レスポンシブデザイン',
             description: 'スマートフォン・タブレット・PCでの表示対応を診断',
             items: 'モバイルフレンドリー（Googleモバイル対応）、ビューポート設定（適切な表示領域）、レスポンシブ画像（デバイス別最適化）、タッチ操作対応',
             icon: 'fas fa-mobile-alt',
-            color: 'teal'
+            color: 'teal',
+            mcpServers: ['Chrome MCP'],
+            agents: ['モバイル最適化エージェント'],
+            mcpDescription: 'Chrome MCPのviewport切り替えでモバイル・デスクトップ表示を検証'
         },
         'httpsConfig': {
             name: 'HTTPS設定',
             description: 'Webサイトのセキュリティ設定と暗号化を診断',
             items: 'SSL証明書（データ暗号化）、HSTSヘッダー（強制HTTPS）、セキュリティヘッダー（CSP・X-Frame-Options）、混在コンテンツ対策',
             icon: 'fas fa-lock',
-            color: 'gray'
+            color: 'gray',
+            mcpServers: ['Chrome MCP'],
+            agents: ['セキュリティ診断エージェント'],
+            mcpDescription: 'Chrome MCPでSSL証明書、セキュリティヘッダーを検証'
         },
         'llmoOptimization': {
             name: 'LLMO特化対策',
             description: 'ChatGPT・Claude等のAI検索エンジンに対する最適化を診断',
             items: 'LLMs.txt（AI向けサイト情報ファイル）、FAQ実装（質問回答形式）、セマンティックセクション（意味的な構造）、AI可読性（自然言語処理対応）',
             icon: 'fas fa-robot',
-            color: 'indigo'
+            color: 'indigo',
+            mcpServers: ['Chrome MCP', 'Schemantra', 'Google Rich Results'],
+            agents: ['LLMO最適化エージェント'],
+            mcpDescription: '全MCPサーバーを統合してAI検索エンジン対応を総合診断'
         }
     };
 
@@ -886,6 +1001,17 @@ function displayTechnicalCategoryResults(categories) {
                     <div class="text-3xl font-bold mb-2">${score}点</div>
                     <div class="text-sm text-gray-600 mb-1">${displayInfo.description}</div>
                     <div class="text-xs text-gray-500 mb-2">${displayInfo.items}</div>
+                    ${displayInfo.mcpServers ? `
+                        <div class="mb-3 p-2 bg-gray-50 rounded text-xs">
+                            <div class="font-semibold mb-1">
+                                <i class="fas fa-server mr-1"></i>使用MCPサーバー: ${displayInfo.mcpServers.join(', ')}
+                            </div>
+                            <div class="text-gray-600">
+                                <i class="fas fa-robot mr-1"></i>エージェント: ${displayInfo.agents.join(', ')}
+                            </div>
+                            <div class="text-gray-500 mt-1">${displayInfo.mcpDescription}</div>
+                        </div>
+                    ` : ''}
                     <div class="w-full bg-gray-200 rounded-full h-2">
                         <div class="bg-${displayInfo.color}-600 h-2 rounded-full" style="width: ${score}%"></div>
                     </div>
@@ -1316,18 +1442,23 @@ function toggleExpandedView() {
 function restoreCompactView() {
     console.log('コンパクト表示に戻ります');
     
-    console.log('コンパクト表示復元: 現在の結果', currentResults);
-    
-    // カテゴリーカードを再表示
-    if (currentResults && currentDiagnosisType === 'technical') {
-        displayTechnicalCategoryResults(currentResults.categories);
-        console.log('テクニカル診断カテゴリーカードを再表示しました');
+    const categoryCardsContainer = document.getElementById('categoryCards');
+    if (!categoryCardsContainer) {
+        console.error('categoryCardsコンテナが見つかりません');
+        return;
     }
     
-    // 表示されていた表は削除
-    const allItemsTable = document.getElementById('allItemsTable');
-    if (allItemsTable && allItemsTable.parentNode) {
-        allItemsTable.parentNode.parentNode.parentNode.remove(); // table -> tbody -> div を削除
+    // 保存された元のコンテンツを復元
+    const originalContent = categoryCardsContainer.getAttribute('data-original-content');
+    if (originalContent) {
+        categoryCardsContainer.innerHTML = originalContent;
+        console.log('元のカテゴリーカードを復元しました');
+    } else {
+        // 保存されていない場合は再生成
+        if (currentResults && currentDiagnosisType === 'technical') {
+            displayTechnicalCategoryResults(currentResults.categories);
+            console.log('テクニカル診断カテゴリーカードを再生成しました');
+        }
     }
     
     // ボタンテキストを元に戻す
